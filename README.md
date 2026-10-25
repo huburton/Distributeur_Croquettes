@@ -1,7 +1,10 @@
 # Connected pet feeder
 
-A kibble dispenser I designed, printed and wired myself, driven by an ESP8266 running
-[ESPHome](https://esphome.io/) and controlled from Home Assistant. Built in November 2025.
+A connected kibble dispenser, driven by an ESP8266 running [ESPHome](https://esphome.io/) and controlled
+from Home Assistant. Built in November 2025.
+
+The mechanical design (hopper, case, bowl) is a model published on MakerWorld, which I printed. The firmware,
+the electronics and the Home Assistant integration are mine: that is what this repository contains.
 
 <img src="docs/feeder.webp" alt="The printed feeder: brown and green case, hopper on top, double bowl below" width="360">
 
@@ -23,7 +26,7 @@ A kibble dispenser I designed, printed and wired myself, driven by an ESP8266 ru
 | Wemos D1 mini (ESP8266) | runs the ESPHome firmware |
 | MOSFET on `D1` | switches the DC motor of the dispenser |
 | Push button on `D2` (internal pull-up, 50 ms debounce) | manual feeding |
-| 3D-printed case, hopper and double bowl | my own print |
+| 3D-printed case, hopper and double bowl | printed from a MakerWorld model |
 
 ## Run it
 
