@@ -9,26 +9,37 @@ esphome:
   project:
     name: esphome.web
     version: '1.0'
+  on_boot:
+    priority: -100
+    then:
+      - delay: 2s
+      - switch.turn_on: switch_mode_auto
 
 esp8266:
   board: d1_mini
 
 logger:
 api:
+  encryption:
+    key: !secret api_encryption_key
+
 ota:
   - platform: esphome
+    password: !secret ota_password
 
 wifi:
-  ssid: "***************"
-  password: "*************"
-  use_address: *************
+  ssid: !secret wifi_ssid
+  password: !secret wifi_password
   min_auth_mode: WPA2
   ap:
     ssid: "Distributeur Fallback"
-    password: "**********"
+    password: !secret fallback_ap_password
 
 web_server:
-  port: ***
+  port: 80
+  auth:
+    username: admin
+    password: !secret web_password
 
 globals:
   - id: feeding_duration
@@ -59,29 +70,37 @@ globals:
 sensor:
   - platform: homeassistant
     id: ha_h1
-    entity_id: input_datetime.repas_1
+    entity_id: input_datetime.heure_repas_matin
     attribute: hour
+    filters:
+      - filter_out: NaN
     on_value:
       then:
         - globals.set: { id: heure_1, value: !lambda 'return x;' }
   - platform: homeassistant
     id: ha_m1
-    entity_id: input_datetime.repas_1
+    entity_id: input_datetime.heure_repas_matin
     attribute: minute
+    filters:
+      - filter_out: NaN
     on_value:
       then:
         - globals.set: { id: min_1, value: !lambda 'return x;' }
   - platform: homeassistant
     id: ha_h2
-    entity_id: input_datetime.repas_2
+    entity_id: input_datetime.heure_repas_soir
     attribute: hour
+    filters:
+      - filter_out: NaN
     on_value:
       then:
         - globals.set: { id: heure_2, value: !lambda 'return x;' }
   - platform: homeassistant
     id: ha_m2
-    entity_id: input_datetime.repas_2
+    entity_id: input_datetime.heure_repas_soir
     attribute: minute
+    filters:
+      - filter_out: NaN
     on_value:
       then:
         - globals.set: { id: min_2, value: !lambda 'return x;' }
@@ -101,6 +120,7 @@ time:
               condition:
                 lambda: |-
                   auto t = id(sntp_time).now();
+                  if (!t.is_valid()) return false;
                   bool repas1 = (t.hour == id(heure_1) && t.minute == id(min_1));
                   bool repas2 = (t.hour == id(heure_2) && t.minute == id(min_2));
                   return (repas1 || repas2) && id(mode_auto);
@@ -113,6 +133,12 @@ output:
     id: motor_mosfet
     inverted: false
 
+text_sensor:
+  - platform: template
+    name: "Dernière distribution"
+    id: last_feeding
+    icon: "mdi:clock-check-outline"
+
 script:
   - id: dispense_food
     mode: single
@@ -121,6 +147,11 @@ script:
       - output.turn_on: motor_mosfet
       - delay: !lambda "return id(feeding_duration) * 1000;"
       - output.turn_off: motor_mosfet
+      - text_sensor.template.publish:
+          id: last_feeding
+          state: !lambda |-
+            auto time = id(sntp_time).now();
+            return time.strftime("%H:%M le %d/%m");
       - logger.log: "Fin de la distribution."
 
 number:
@@ -132,6 +163,7 @@ number:
     min_value: 0.0
     max_value: 240.0
     step: 5.0
+    mode: box
     optimistic: true
     initial_value: 120.0
     set_action:

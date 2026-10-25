@@ -1,52 +1,48 @@
-# 🐾 Distributeur de Croquettes Connecté (ESPHome & Home Assistant)
+# Connected pet feeder
 
-Un projet de distributeur de croquettes pour animaux (chiens / chats), rendu intelligent grâce à un ESP8266 (Wemos D1 Mini) sous **ESPHome** et parfaitement intégré à **Home Assistant**.
+A kibble dispenser I designed, printed and wired myself, driven by an ESP8266 running
+[ESPHome](https://esphome.io/) and controlled from Home Assistant. Built in November 2025.
 
-## ✨ Fonctionnalités
+<img src="docs/feeder.webp" alt="The printed feeder: brown and green case, hopper on top, double bowl below" width="360">
 
-- 🕰️ **Planification des repas** : Gestion de 2 repas par jour configurables directement depuis l'interface Home Assistant.
-- ⚖️ **Portions ajustables** : Réglage précis de la durée de distribution (en secondes) pour contrôler la quantité de croquettes servie, accessible via un curseur dédié.
-- 🕹️ **Contrôle manuel** : 
-  - Déclenchement à distance depuis Home Assistant via un bouton ("Distribuer maintenant").
-  - Déclenchement local grâce à un **bouton physique** placé sur le distributeur.
-- 🤖 **Mode Automatique / Manuel** : Possibilité de désactiver les repas planifiés à tout moment à l'aide d'un interrupteur ("Mode Automatique").
-- 🌐 **Web Serveur Local** : Paramétrage et accès garantis via une page web locale (serveur web embarqué), même si Home Assistant n'est pas accessible.
-- 🔄 **Mise à jour OTA** : Mises à jour du microprogramme intégrées sans fil directement depuis l'interface ESPHome.
+## What it does
 
-## 🛠️ Matériel Requis
+- **Two scheduled meals a day.** The times live in Home Assistant (`input_datetime` helpers) and are
+  pushed to the board, which keeps the last values in flash. If Home Assistant is down, the feeder still
+  runs on its own clock (SNTP).
+- **Adjustable portion.** The portion is the motor run time, set with a slider from 0 to 240 s.
+- **Manual feeding** from a Home Assistant button, or from the physical button on the case.
+- **Auto mode switch** to pause the schedule (holidays, vet diet), switched back on at every boot.
+- **"Last feeding" sensor**, so anyone at home can see in the app whether the pet has eaten.
+- Updates over Wi-Fi (OTA), local web page with a password, fallback access point if the Wi-Fi is gone.
 
-- **Microcontrôleur** : Wemos D1 Mini (ou équivalent ESP8266)
-- **Actionneur mécanique** : Moteur DC (5V ou 12V), un servomoteur ou une vis sans fin pour faire tomber les croquettes.
-- **Module de puissance** : Module MOSFET pour piloter la tension de l'actionneur.
-- **Bouton poussoir** : Pour déclencher une portion manuellement à côté de la gamelle.
-- **Alimentation** : Adaptée à l'actionneur choisi.
+## Hardware
 
-## 🔌 Schéma de Câblage (Pinout ESP8266)
+| Part | Role |
+|---|---|
+| Wemos D1 mini (ESP8266) | runs the ESPHome firmware |
+| MOSFET on `D1` | switches the DC motor of the dispenser |
+| Push button on `D2` (internal pull-up, 50 ms debounce) | manual feeding |
+| 3D-printed case, hopper and double bowl | my own print |
 
-| Composant | Pin D1 Mini | Commentaire / Mode |
-|-----------|-------------|--------------------|
-| **Gate du MOSFET** (Moteur) | `D1` | Pilotage de la distribution en sortie standard. |
-| **Bouton Physique** | `D2` | Utilisé en `INPUT_PULLUP` (inversé = actif à l'état bas). |
+## Run it
 
-## 🚀 Installation & Paramétrage
+1. Copy `secrets.yaml.example` to `secrets.yaml` and fill in your Wi-Fi and keys
+   (`secrets.yaml` is git-ignored).
+2. Flash once over USB, then over the air:
 
-### 1. Préparation Côté Home Assistant
-L'ESP étant programmé pour aller chercher la date depuis *Home Assistant*, vous devez impérativement créer au préalable deux entités de type `input_datetime` (Heure uniquement) :
+   ```bash
+   esphome run distributeur.yaml
+   ```
 
-1. Entité 1 : `input_datetime.repas_1`
-2. Entité 2 : `input_datetime.repas_2`
+3. In Home Assistant, add the device (ESPHome integration, with the API encryption key) and create two
+   time-only `input_datetime` helpers: `heure_repas_matin` and `heure_repas_soir`.
 
-Ces entités détermineront quand s'activera le script de distribution au quotidien.
+Entity names are in French because the household uses the French UI
+(*Distribuer maintenant* = feed now, *Mode Automatique* = auto mode, *Durée de distribution* = portion time).
 
-### 2. Flash ESPHome
-1. Clonez ce dépôt.
-2. Éditez dans `distributeur.yaml` les informations Wi-Fi et les mots de passe.
-3. Assurez-vous d'utiliser une intégration NTP locale appropriée (le fuseau par défaut est `Europe/Brussels`).
-4. Flashez la carte D1 Mini via un câble USB ou over-the-air (OTA).
+## How the schedule works
 
-## 🛡️ Résilience, Sécurité & Fonctionnalités Avancées
-- **Sauvegarde d'état :** La durée définie de la distribution ainsi que les états automatiques/manuels sont conservés dans la mémoire RAM du module qui redémarre dessus (`restore_value: yes`).
-- **Logique Autonome :** Grâce au service SNTP qui tourne sur l'ESP, l'heure est synchronisée de manière indépendante. De plus, tant que le module sauvegarde les heures récupérées via HA, une coupure de votre serveur box domotique n'empêchera pas votre animal d'être nourri à son heure (assuré par la logique lambda interne).
-
----
-Projet propulsé par ESPHome 🚀
+Every minute the SNTP clock fires a lambda that compares the current time with the two stored meal times.
+On a match, and if auto mode is on, it runs the `dispense_food` script: motor on, wait, motor off, timestamp.
+The script runs in `mode: single`, so a button press during a meal cannot start a second one.
