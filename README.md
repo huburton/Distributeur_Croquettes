@@ -1,5 +1,7 @@
 # Connected pet feeder
 
+*[Version française](README.fr.md)*
+
 A connected kibble dispenser, driven by an ESP8266 running [ESPHome](https://esphome.io/) and controlled
 from Home Assistant. Built in November 2025.
 
